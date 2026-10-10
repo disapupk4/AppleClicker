@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Яблочный Кликер</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap');
+    :root {
+      --bg: #070f0b; --card: rgba(18,36,28,0.72); --accent: #4ade80; --gold: #fbbf24;
+      --text: #ecfdf5; --muted: #6b9b82; --border: rgba(74,222,128,0.15);
+    }
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+    body {
+      font-family:'Outfit',system-ui,sans-serif; background:var(--bg); color:var(--text);
+      min-height:100dvh; display:flex; flex-direction:column; align-items:center; overflow-x:hidden; position:relative;
+    }
+    .bg-layer { position:fixed; inset:0; pointer-events:none; z-index:0; overflow:hidden; }
+    .bg-gradient {
+      position:absolute; inset:0;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(34,100,60,0.45) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 100%, rgba(20,60,40,0.3) 0%, transparent 50%),
+        linear-gradient(180deg,#070f0b 0%,#0a1610 50%,#06100c 100%);
+    }
+    .bg-vignette { position:absolute; inset:0; background:radial-gradient(ellipse at center,transparent 40%,rgba(0,0,0,0.55) 100%); }
+    .particles { position:absolute; inset:0; }
+    .particle {
+      position:absolute; width:6px; height:6px; border-radius:50%;
+      background:rgba(74,222,128,0.25); animation:drift linear infinite; opacity:0;
+    }
+    .particle.leaf { width:10px; height:10px; border-radius:2px 10px; background:rgba(74,222,128,0.35); }
+    @keyframes drift {
+      0% { transform:translateY(100vh) rotate(0) scale(0.6); opacity:0; }
+      10% { opacity:0.7; } 90% { opacity:0.5; }
+      100% { transform:translateY(-10vh) rotate(360deg) scale(1); opacity:0; }
+    }
+    .rays {
+      position:absolute; top:-20%; left:50%; width:140%; height:80%; transform:translateX(-50%);
+      background:conic-gradient(from 200deg at 50% 0%, transparent 0deg, rgba(74,222,128,0.04) 20deg, transparent 40deg, rgba(52,211,153,0.03) 60deg, transparent 80deg, rgba(74,222,128,0.04) 100deg, transparent 140deg);
+      animation:raySpin 40s linear infinite; opacity:0.7;
+    }
+    @keyframes raySpin { from{transform:translateX(-50%) rotate(0)} to{transform:translateX(-50%) rotate(360deg)} }
+
+    .app { position:relative; z-index:1; width:100%; max-width:440px; min-height:100dvh; display:flex; flex-direction:column; align-items:center; padding-bottom:12px; }
+
+    .header { width:100%; padding:18px 20px 6px; text-align:center; }
+    .header h1 {
+      font-size:1.1rem; font-weight:700; letter-spacing:0.04em;
+      background:linear-gradient(135deg,#4ade80,#a7f3d0,#4ade80); background-size:200% 200%;
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+      animation:shimmer 4s ease infinite;
+    }
+    @keyframes shimmer { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+    .apples-box {
+      margin-top:10px; padding:10px 26px; border-radius:20px; display:inline-block;
+      background:linear-gradient(145deg,rgba(251,191,36,0.12),rgba(251,191,36,0.04));
+      border:1px solid rgba(251,191,36,0.25);
+      box-shadow:0 0 30px rgba(251,191,36,0.1), inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+    .apples-display { font-size:1.9rem; font-weight:800; color:var(--gold); text-shadow:0 0 24px rgba(251,191,36,0.5); line-height:1.1; }
+    .apples-display span { font-size:0.9rem; color:rgba(251,191,36,0.65); font-weight:600; }
+    .passive-info { font-size:0.78rem; color:var(--muted); margin-top:5px; }
+    .save-badge { display:inline-flex; align-items:center; gap:5px; margin-top:6px; font-size:0.68rem; color:var(--muted); opacity:0.7; }
+    .save-badge .dot { width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 6px var(--accent); animation:pulse 2s ease infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    .tree-area { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; padding:4px 16px 8px; position:relative; min-height:220px; }
+    .tree-btn {
+      width:200px; height:220px; border:none; background:transparent; cursor:pointer;
+      display:flex; align-items:center; justify-content:center; position:relative; outline:none;
+      transition:transform 0.1s cubic-bezier(0.34,1.56,0.64,1); padding:0; z-index:5;
+      visibility:visible; opacity:1;
+    }
+    .tree-btn .tree-svg, .tree-svg {
+      display:block; width:190px; height:210px; max-width:100%;
+      visibility:visible; opacity:1;
+    }
+    .tree-btn:active { transform:scale(0.92); }
+    .tree-btn.crit .tree-svg { animation:critFlash 0.45s ease; }
+    @keyframes critFlash { 0%{filter:brightness(1.8) drop-shadow(0 0 20px #fbbf24)} 100%{filter:brightness(1)} }
+    .tree-svg { width:190px; height:210px; filter:drop-shadow(0 12px 24px rgba(0,0,0,0.5)); transition:filter 0.4s ease; }
+
+    /* Leaf rustle on click — smooth */
+    .tree-btn.rustle .foliage {
+      animation: foliageRustle 0.7s cubic-bezier(0.33, 0.1, 0.25, 1);
+      transform-origin: 100px 130px;
+    }
+    .tree-btn.rustle .canopy {
+      animation: leafLayer 0.65s cubic-bezier(0.33, 0.1, 0.25, 1);
+      transform-origin: center center;
+    }
+    .tree-btn.rustle .apple {
+      animation: appleSway 0.6s cubic-bezier(0.33, 0.1, 0.25, 1);
+    }
+    @keyframes foliageRustle {
+      0%   { transform: rotate(0deg); }
+      25%  { transform: rotate(-1.6deg); }
+      55%  { transform: rotate(1.3deg); }
+      80%  { transform: rotate(-0.5deg); }
+      100% { transform: rotate(0deg); }
+    }
+    @keyframes leafLayer {
+      0%, 100% { transform: scale(1); }
+      40% { transform: scale(1.008, 0.992); }
+      70% { transform: scale(0.996, 1.004); }
+    }
+    @keyframes appleSway {
+      0%, 100% { transform: translate(0, 0); }
+      35% { transform: translate(0.8px, 1.2px); }
+      70% { transform: translate(-0.5px, -0.6px); }
+    }
+    .ground-glow {
+      position:absolute; bottom:16%; left:50%; transform:translateX(-50%); width:150px; height:36px;
+      background:radial-gradient(ellipse,rgba(74,222,128,0.2) 0%,transparent 70%); pointer-events:none; z-index:1;
+      animation:groundPulse 3s ease-in-out infinite;
+    }
+    @keyframes groundPulse { 0%,100%{opacity:0.6;transform:translateX(-50%) scale(1)} 50%{opacity:1;transform:translateX(-50%) scale(1.08)} }
+
+    /* Skins */
+    .skin-default .canopy{fill:#22c55e} .skin-default .trunk{fill:#8B5A2B} .skin-default .apple{fill:#ef4444}
+    .skin-golden .canopy{fill:#fbbf24} .skin-golden .trunk{fill:#a16207} .skin-golden .apple{fill:#fde68a}
+    .skin-golden .tree-svg{filter:drop-shadow(0 12px 24px rgba(0,0,0,0.4)) drop-shadow(0 0 22px rgba(251,191,36,0.6))}
+    .skin-crystal .canopy{fill:#22d3ee} .skin-crystal .trunk{fill:#0e7490} .skin-crystal .apple{fill:#a5f3fc}
+    .skin-crystal .tree-svg{filter:drop-shadow(0 12px 24px rgba(0,0,0,0.35)) drop-shadow(0 0 24px rgba(34,211,238,0.65))}
+    .skin-fire .canopy{fill:#f97316} .skin-fire .trunk{fill:#9a3412} .skin-fire .apple{fill:#fdba74}
+    .skin-fire .tree-svg{filter:drop-shadow(0 12px 24px rgba(0,0,0,0.4)) drop-shadow(0 0 26px rgba(249,115,22,0.75)); animation:fireGlow 2s ease-in-out infinite}
+    @keyframes fireGlow{0%,100%{filter:drop-shadow(0 12px 24px rgba(0,0,0,0.4)) drop-shadow(0 0 20px rgba(249,115,22,0.6))}50%{filter:drop-shadow(0 12px 24px rgba(0,0,0,0.4)) drop-shadow(0 0 32px rgba(239,68,68,0.9))}}
+    .skin-neon .canopy{fill:#c084fc} .skin-neon .trunk{fill:#6b21a8} .skin-neon .apple{fill:#f0abfc}
+    .skin-neon .tree-svg{filter:drop-shadow(0 12px 24px rgba(0,0,0,0.5)) drop-shadow(0 0 18px #c084fc) drop-shadow(0 0 36px rgba(168,85,247,0.5))}
+    .skin-cosmic .canopy{fill:#818cf8} .skin-cosmic .trunk{fill:#3730a3} .skin-cosmic .apple{fill:#c7d2fe}
+    .skin-cosmic .tree-svg{filter:drop-shadow(0 12px 24px rgba(0,0,0,0.5)) drop-shadow(0 0 22px rgba(99,102,241,0.65)); animation:cosmicPulse 3.5s ease-in-out infinite}
+    @keyframes cosmicPulse{0%,100%{filter:drop-shadow(0 12px 24px rgba(0,0,0,0.5)) drop-shadow(0 0 18px rgba(99,102,241,0.5))}50%{filter:drop-shadow(0 12px 24px rgba(0,0,0,0.5)) drop-shadow(0 0 28px rgba(139,92,246,0.8))}}
+    .skin-rainbow .canopy{fill:#ec4899} .skin-rainbow .trunk{fill:#9d174d} .skin-rainbow .apple{fill:#f9a8d4}
+    .skin-rainbow .tree-svg{filter:drop-shadow(0 12px 24px rgba(0,0,0,0.35)) drop-shadow(0 0 20px rgba(236,72,153,0.5))}
+    .skin-void .canopy{fill:#4c1d95} .skin-void .trunk{fill:#1e1b4b} .skin-void .apple{fill:#a78bfa}
+    .skin-void .tree-svg{filter:drop-shadow(0 12px 24px rgba(0,0,0,0.7)) drop-shadow(0 0 20px rgba(76,29,149,0.75))}
+    .skin-sakura .canopy{fill:#f9a8d4} .skin-sakura .trunk{fill:#9f1239} .skin-sakura .apple{fill:#fda4af}
+    .skin-sakura .tree-svg{filter:drop-shadow(0 12px 24px rgba(0,0,0,0.4)) drop-shadow(0 0 18px rgba(244,114,182,0.5))}
+    .skin-toxic .canopy{fill:#a3e635} .skin-toxic .trunk{fill:#3f6212} .skin-toxic .apple{fill:#d9f99d}
+    .skin-toxic .tree-svg{filter:drop-shadow(0 12px 24px rgba(0,0,0,0.4)) drop-shadow(0 0 20px rgba(163,230,53,0.55))}
+    .skin-frozen .canopy{fill:#7dd3fc} .skin-frozen .trunk{fill:#075985} .skin-frozen .apple{fill:#e0f2fe}
+    .skin-frozen .tree-svg{filter:drop-shadow(0 12px 24px rgba(0,0,0,0.4)) drop-shadow(0 0 22px rgba(125,211,252,0.6))}
+    .skin-magma .canopy{fill:#ea580c} .skin-magma .trunk{fill:#7c2d12} .skin-magma .apple{fill:#fdba74}
+    .skin-magma .tree-svg{filter:drop-shadow(0 12px 24px rgba(0,0,0,0.45)) drop-shadow(0 0 24px rgba(234,88,12,0.65)); animation:fireGlow 2.5s ease-in-out infinite}
+    .skin-shadow .canopy{fill:#475569} .skin-shadow .trunk{fill:#1e293b} .skin-shadow .apple{fill:#94a3b8}
+    .skin-shadow .tree-svg{filter:drop-shadow(0 12px 24px rgba(0,0,0,0.7)) drop-shadow(0 0 16px rgba(71,85,105,0.6))}
+    .skin-celestial .canopy{fill:#fde047} .skin-celestial .trunk{fill:#6d28d9} .skin-celestial .apple{fill:#fef08a}
+    .skin-celestial .tree-svg{filter:drop-shadow(0 12px 24px rgba(0,0,0,0.4)) drop-shadow(0 0 26px rgba(253,224,71,0.55)); animation:cosmicPulse 4s ease-in-out infinite}
+
+    .floating-text {
+      position:absolute; font-weight:800; font-size:1.25rem; color:var(--gold); pointer-events:none;
+      animation:floatUp 1s cubic-bezier(0.22,1,0.36,1) forwards;
+      text-shadow:0 2px 12px rgba(0,0,0,0.8),0 0 10px rgba(251,191,36,0.4); z-index:30;
+    }
+    .floating-text.crit { color:#fb923c; font-size:1.55rem; }
+    .floating-text.golden { color:#fde68a; font-size:1.65rem; }
+    @keyframes floatUp {
+      0%{opacity:1;transform:translateY(0) scale(0.8)} 20%{opacity:1;transform:translateY(-20px) scale(1.15)}
+      100%{opacity:0;transform:translateY(-110px) scale(1)}
+    }
+    .burst-particle {
+      position:absolute; width:8px; height:8px; border-radius:50%; pointer-events:none; z-index:25;
+      animation:burst 0.7s ease-out forwards;
+    }
+    @keyframes burst { 0%{opacity:1;transform:translate(0,0) scale(1)} 100%{opacity:0;transform:translate(var(--tx),var(--ty)) scale(0.2)} }
+
+    .nav { width:100%; display:flex; gap:6px; padding:0 14px 10px; flex-wrap:wrap; }
+    .nav button {
+      flex:1; min-width:70px; padding:11px 4px; border:1px solid var(--border); border-radius:14px;
+      background:var(--card); backdrop-filter:blur(12px); color:var(--text); font-family:inherit;
+      font-size:0.78rem; font-weight:600; cursor:pointer; transition:all 0.2s; box-shadow:0 4px 16px rgba(0,0,0,0.2);
+    }
+    .nav button:hover { border-color:rgba(74,222,128,0.35); }
+    .nav button.active {
+      background:linear-gradient(145deg,rgba(34,197,94,0.25),rgba(22,101,52,0.3));
+      border-color:rgba(74,222,128,0.5); color:var(--accent);
+      box-shadow:0 0 20px rgba(74,222,128,0.15),0 4px 16px rgba(0,0,0,0.2);
+    }
+
+    .panel {
+      display:none; width:100%; padding:0 14px 14px; max-height:46vh; overflow-y:auto;
+      animation:panelIn 0.3s cubic-bezier(0.22,1,0.36,1);
+    }
+    .panel.active { display:block; }
+    @keyframes panelIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+    .panel h2 { font-size:1rem; font-weight:700; margin-bottom:10px; color:var(--accent); }
+
+    .item {
+      background:var(--card); backdrop-filter:blur(12px); border:1px solid var(--border); border-radius:14px;
+      padding:11px 12px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;
+      gap:8px; transition:border-color 0.2s,box-shadow 0.2s; box-shadow:0 4px 16px rgba(0,0,0,0.15);
+    }
+    .item:hover { border-color:rgba(74,222,128,0.3); }
+    .item-info { flex:1; min-width:0; }
+    .item-name { font-weight:700; font-size:0.86rem; margin-bottom:1px; }
+    .item-desc { font-size:0.7rem; color:var(--muted); }
+    .item-level { font-size:0.68rem; color:var(--accent); margin-top:2px; font-weight:600; }
+    .item-bonus { font-size:0.68rem; color:var(--gold); margin-top:2px; font-weight:600; }
+
+    .buy-btn {
+      padding:9px 11px; border:none; border-radius:11px;
+      background:linear-gradient(145deg,#22c55e,#16a34a); color:#052e16;
+      font-family:inherit; font-weight:700; font-size:0.76rem; cursor:pointer; white-space:nowrap;
+      transition:all 0.15s; min-width:82px; text-align:center; box-shadow:0 4px 12px rgba(34,197,94,0.3);
+    }
+    .buy-btn:hover { background:linear-gradient(145deg,#4ade80,#22c55e); transform:translateY(-1px); }
+    .buy-btn:active { transform:scale(0.96); }
+    .buy-btn:disabled { background:#1a2e24; color:#4a6b5a; cursor:not-allowed; box-shadow:none; }
+    .buy-btn.owned { background:transparent; color:var(--accent); border:1px solid rgba(74,222,128,0.5); box-shadow:none; }
+    .buy-btn.equipped { background:linear-gradient(145deg,#4ade80,#22c55e); color:#052e16; box-shadow:0 0 16px rgba(74,222,128,0.35); }
+
+    .skin-preview { width:46px; height:50px; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+    .skin-preview svg { width:42px; height:46px; }
+
+    .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .stat-card {
+      background:var(--card); backdrop-filter:blur(12px); border:1px solid var(--border); border-radius:13px;
+      padding:12px 8px; text-align:center; box-shadow:0 4px 14px rgba(0,0,0,0.15);
+    }
+    .stat-value { font-size:1.1rem; font-weight:800; color:var(--gold); text-shadow:0 0 12px rgba(251,191,36,0.3); }
+    .stat-label { font-size:0.68rem; color:var(--muted); margin-top:3px; font-weight:500; }
+
+    /* Leaderboard */
+    .lb-row {
+      display:flex; align-items:center; gap:10px; padding:10px 12px; margin-bottom:6px;
+      background:var(--card); border:1px solid var(--border); border-radius:12px;
+    }
+    .lb-rank { font-weight:800; font-size:1rem; min-width:28px; text-align:center; }
+    .lb-rank.gold { color:#fbbf24; } .lb-rank.silver { color:#94a3b8; } .lb-rank.bronze { color:#d97706; }
+    .lb-name { flex:1; font-weight:600; font-size:0.88rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .lb-name.you { color:var(--accent); }
+    .lb-score { font-weight:700; font-size:0.82rem; color:var(--gold); white-space:nowrap; }
+
+    .name-input-row {
+      display:flex; gap:8px; margin-bottom:12px;
+    }
+    .name-input-row input {
+      flex:1; padding:10px 14px; border-radius:12px; border:1px solid var(--border);
+      background:rgba(0,0,0,0.3); color:var(--text); font-family:inherit; font-size:0.88rem; outline:none;
+    }
+    .name-input-row input:focus { border-color:rgba(74,222,128,0.5); }
+    .name-input-row button {
+      padding:10px 16px; border:none; border-radius:12px;
+      background:linear-gradient(145deg,#22c55e,#16a34a); color:#052e16;
+      font-family:inherit; font-weight:700; font-size:0.82rem; cursor:pointer;
+    }
+
+    .toast {
+      position:fixed; bottom:100px; left:50%; transform:translateX(-50%) translateY(24px) scale(0.95);
+      background:rgba(18,40,30,0.92); backdrop-filter:blur(16px); color:var(--accent);
+      padding:12px 22px; border-radius:30px; font-weight:600; font-size:0.86rem; opacity:0;
+      transition:all 0.35s cubic-bezier(0.22,1,0.36,1); pointer-events:none; z-index:100;
+      border:1px solid rgba(74,222,128,0.35); box-shadow:0 8px 32px rgba(0,0,0,0.4);
+      white-space:nowrap; max-width:90vw; overflow:hidden; text-overflow:ellipsis;
+    }
+    .toast.show { opacity:1; transform:translateX(-50%) translateY(0) scale(1); }
+
+    .panel::-webkit-scrollbar { width:4px; }
+    .panel::-webkit-scrollbar-track { background:transparent; }
+    .panel::-webkit-scrollbar-thumb { background:rgba(74,222,128,0.25); border-radius:8px; }
+    .footer-note { font-size:0.62rem; color:#3a5c4a; text-align:center; padding:4px 0 8px; letter-spacing:0.03em; }
+  </style>
+</head>
+<body>
+  <div class="bg-layer">
+    <div class="bg-gradient"></div>
+    <div class="rays"></div>
+    <div class="particles" id="particles"></div>
+    <div class="bg-vignette"></div>
+  </div>
+
+  <div class="app">
+    <div class="header">
+      <h1>🍎 ЯБЛОЧНЫЙ КЛИКЕР</h1>
+      <div class="apples-box">
+        <div class="apples-display" id="applesDisplay">0 <span>яблок</span></div>
+      </div>
+      <div class="passive-info" id="passiveInfo">+0 / сек</div>
+      <div class="save-badge"><span class="dot"></span> Прогресс сохранён</div>
+    </div>
+
+    <div class="tree-area">
+      <div class="ground-glow"></div>
+      <button class="tree-btn skin-default" id="treeBtn" title="Кликни!"><svg class="tree-svg" viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="100" cy="208" rx="52" ry="9" fill="rgba(0,0,0,0.35)"/>
+        <path class="trunk" d="M86 118 L86 198 Q100 208 114 198 L114 118 Z" fill="#8B5A2B"/>
+        <path d="M95 128 L95 192" stroke="rgba(0,0,0,0.2)" stroke-width="2.5" fill="none"/>
+        <path d="M105 138 L105 188" stroke="rgba(0,0,0,0.12)" stroke-width="1.8" fill="none"/>
+        <g class="foliage">
+          <ellipse class="canopy" cx="100" cy="76" rx="74" ry="60" fill="#22c55e"/>
+          <ellipse class="canopy" cx="68" cy="94" rx="44" ry="38" fill="#16a34a" opacity="0.95"/>
+          <ellipse class="canopy" cx="132" cy="90" rx="42" ry="36" fill="#16a34a" opacity="0.95"/>
+          <ellipse class="canopy" cx="100" cy="52" rx="50" ry="42" fill="#4ade80" opacity="0.95"/>
+          <ellipse class="canopy" cx="78" cy="68" rx="28" ry="22" fill="#86efac" opacity="0.75"/>
+          <ellipse cx="80" cy="52" rx="20" ry="14" fill="rgba(255,255,255,0.25)"/>
+          <circle class="apple" cx="70" cy="68" r="6.5" fill="#ef4444"/>
+          <circle class="apple" cx="120" cy="58" r="6" fill="#ef4444"/>
+          <circle class="apple" cx="94" cy="94" r="7" fill="#dc2626"/>
+          <circle class="apple" cx="138" cy="86" r="5.5" fill="#ef4444"/>
+          <circle class="apple" cx="58" cy="98" r="5.5" fill="#f87171"/>
+          <circle class="apple" cx="110" cy="78" r="5" fill="#ef4444"/>
+          <line x1="70" y1="61.5" x2="70" y2="57" stroke="#3f6212" stroke-width="1.6"/>
+          <line x1="120" y1="52" x2="120" y2="48" stroke="#3f6212" stroke-width="1.6"/>
+          <line x1="94" y1="87" x2="94" y2="83" stroke="#3f6212" stroke-width="1.6"/>
+        </g>
+      </svg></button>
+    </div>
+
+    <div class="nav">
+      <button class="active" data-panel="upgrades">⬆️ Улучш.</button>
+      <button data-panel="shop">🛒 Скины</button>
+      <button data-panel="stats">📊 Статы</button>
+      <button data-panel="leaderboard">🏆 Топ</button>
+    </div>
+
+    <div class="panel active" id="panel-upgrades">
+      <h2>Ветка улучшений</h2>
+      <div id="upgradesList"></div>
+    </div>
+
+    <div class="panel" id="panel-shop">
+      <h2>Скины на дерево</h2>
+      <div id="shopList"></div>
+    </div>
+
+    <div class="panel" id="panel-stats">
+      <h2>Твоя статистика</h2>
+      <div class="stats-grid" id="statsGrid"></div>
+    </div>
+
+    <div class="panel" id="panel-leaderboard">
+      <h2>🏆 Топ игроков</h2>
+      <p style="font-size:0.75rem;color:var(--muted);margin:-6px 0 10px">Кто играл на сайте (через бота или напрямую)</p>
+      <div class="name-input-row">
+        <input type="text" id="playerNameInput" maxlength="16" placeholder="Твой ник..." />
+        <button id="saveNameBtn">OK</button>
+      </div>
+      <div id="leaderboardList"></div>
+    </div>
+
+    <div class="footer-note">Автосохранение · Оффлайн-прогресс</div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <svg width="0" height="0" style="position:absolute">
+    <defs>
+      <linearGradient id="gDef" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#6ee7b7"/><stop offset="40%" stop-color="#34d399"/><stop offset="100%" stop-color="#059669"/></linearGradient>
+      <linearGradient id="gTr" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#78350f"/><stop offset="50%" stop-color="#a16207"/><stop offset="100%" stop-color="#78350f"/></linearGradient>
+      <linearGradient id="gGold" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#fef08a"/><stop offset="35%" stop-color="#fbbf24"/><stop offset="100%" stop-color="#d97706"/></linearGradient>
+      <linearGradient id="gTrGold" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#a16207"/><stop offset="50%" stop-color="#ca8a04"/><stop offset="100%" stop-color="#a16207"/></linearGradient>
+      <linearGradient id="gCrys" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#cffafe"/><stop offset="40%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#0e7490"/></linearGradient>
+      <linearGradient id="gTrCrys" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#155e75"/><stop offset="50%" stop-color="#0891b2"/><stop offset="100%" stop-color="#155e75"/></linearGradient>
+      <linearGradient id="gFire" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#fed7aa"/><stop offset="30%" stop-color="#fb923c"/><stop offset="70%" stop-color="#ef4444"/><stop offset="100%" stop-color="#991b1b"/></linearGradient>
+      <linearGradient id="gTrFire" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#7c2d12"/><stop offset="50%" stop-color="#9a3412"/><stop offset="100%" stop-color="#7c2d12"/></linearGradient>
+      <linearGradient id="gNeon" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#f0abfc"/><stop offset="40%" stop-color="#c084fc"/><stop offset="100%" stop-color="#7c3aed"/></linearGradient>
+      <linearGradient id="gTrNeon" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#4c1d95"/><stop offset="50%" stop-color="#6d28d9"/><stop offset="100%" stop-color="#4c1d95"/></linearGradient>
+      <linearGradient id="gCos" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#c7d2fe"/><stop offset="35%" stop-color="#818cf8"/><stop offset="70%" stop-color="#4f46e5"/><stop offset="100%" stop-color="#312e81"/></linearGradient>
+      <linearGradient id="gTrCos" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#1e1b4b"/><stop offset="50%" stop-color="#312e81"/><stop offset="100%" stop-color="#1e1b4b"/></linearGradient>
+      <linearGradient id="gRain" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#f87171"/><stop offset="20%" stop-color="#fb923c"/><stop offset="40%" stop-color="#facc15"/><stop offset="60%" stop-color="#4ade80"/><stop offset="80%" stop-color="#60a5fa"/><stop offset="100%" stop-color="#c084fc"/></linearGradient>
+      <linearGradient id="gTrRain" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#7c2d12"/><stop offset="50%" stop-color="#a16207"/><stop offset="100%" stop-color="#7c2d12"/></linearGradient>
+      <linearGradient id="gVoid" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#7c3aed"/><stop offset="40%" stop-color="#5b21b6"/><stop offset="100%" stop-color="#1e0a3c"/></linearGradient>
+      <linearGradient id="gTrVoid" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#0c0618"/><stop offset="50%" stop-color="#1e0a3c"/><stop offset="100%" stop-color="#0c0618"/></linearGradient>
+      <linearGradient id="gSak" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#fbcfe8"/><stop offset="40%" stop-color="#f472b6"/><stop offset="100%" stop-color="#be185d"/></linearGradient>
+      <linearGradient id="gTrSak" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#7c2d12"/><stop offset="50%" stop-color="#9a3412"/><stop offset="100%" stop-color="#7c2d12"/></linearGradient>
+      <linearGradient id="gTox" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#d9f99d"/><stop offset="40%" stop-color="#a3e635"/><stop offset="100%" stop-color="#4d7c0f"/></linearGradient>
+      <linearGradient id="gTrTox" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#365314"/><stop offset="50%" stop-color="#3f6212"/><stop offset="100%" stop-color="#365314"/></linearGradient>
+      <linearGradient id="gFro" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#e0f2fe"/><stop offset="40%" stop-color="#7dd3fc"/><stop offset="100%" stop-color="#0369a1"/></linearGradient>
+      <linearGradient id="gTrFro" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#0c4a6e"/><stop offset="50%" stop-color="#075985"/><stop offset="100%" stop-color="#0c4a6e"/></linearGradient>
+      <linearGradient id="gMag" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#fdba74"/><stop offset="30%" stop-color="#f97316"/><stop offset="70%" stop-color="#dc2626"/><stop offset="100%" stop-color="#7f1d1d"/></linearGradient>
+      <linearGradient id="gTrMag" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#451a03"/><stop offset="50%" stop-color="#7c2d12"/><stop offset="100%" stop-color="#451a03"/></linearGradient>
+      <linearGradient id="gSha" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#64748b"/><stop offset="40%" stop-color="#334155"/><stop offset="100%" stop-color="#0f172a"/></linearGradient>
+      <linearGradient id="gTrSha" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#1e293b"/><stop offset="50%" stop-color="#334155"/><stop offset="100%" stop-color="#1e293b"/></linearGradient>
+      <linearGradient id="gCel" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#fef9c3"/><stop offset="30%" stop-color="#fde047"/><stop offset="70%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#6d28d9"/></linearGradient>
+      <linearGradient id="gTrCel" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#4c1d95"/><stop offset="50%" stop-color="#6d28d9"/><stop offset="100%" stop-color="#4c1d95"/></linearGradient>
+    </defs>
+  </svg>
+
+  <script>
+    function createTreeSVG() {
+      return `<svg class="tree-svg" viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="tCanopy" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#6ee7b7"/><stop offset="45%" stop-color="#34d399"/><stop offset="100%" stop-color="#059669"/>
+          </linearGradient>
+          <linearGradient id="tTrunk" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#78350f"/><stop offset="50%" stop-color="#a16207"/><stop offset="100%" stop-color="#78350f"/>
+          </linearGradient>
+        </defs>
+        <ellipse cx="100" cy="208" rx="52" ry="9" fill="rgba(0,0,0,0.35)"/>
+        <path class="trunk" d="M86 118 L86 198 Q100 208 114 198 L114 118 Z" fill="#8B5A2B"/>
+        <path d="M95 128 L95 192" stroke="rgba(0,0,0,0.2)" stroke-width="2.5" fill="none"/>
+        <path d="M105 138 L105 188" stroke="rgba(0,0,0,0.12)" stroke-width="1.8" fill="none"/>
+        <g class="foliage">
+          <ellipse class="canopy" cx="100" cy="76" rx="74" ry="60" fill="#22c55e"/>
+          <ellipse class="canopy" cx="68" cy="94" rx="44" ry="38" fill="#16a34a" opacity="0.95"/>
+          <ellipse class="canopy" cx="132" cy="90" rx="42" ry="36" fill="#16a34a" opacity="0.95"/>
+          <ellipse class="canopy" cx="100" cy="52" rx="50" ry="42" fill="#4ade80" opacity="0.95"/>
+          <ellipse class="canopy" cx="78" cy="68" rx="28" ry="22" fill="#86efac" opacity="0.75"/>
+          <ellipse cx="80" cy="52" rx="20" ry="14" fill="rgba(255,255,255,0.25)"/>
+          <circle class="apple" cx="70" cy="68" r="6.5" fill="#ef4444"/>
+          <circle class="apple" cx="120" cy="58" r="6" fill="#ef4444"/>
+          <circle class="apple" cx="94" cy="94" r="7" fill="#dc2626"/>
+          <circle class="apple" cx="138" cy="86" r="5.5" fill="#ef4444"/>
+          <circle class="apple" cx="58" cy="98" r="5.5" fill="#f87171"/>
+          <circle class="apple" cx="110" cy="78" r="5" fill="#ef4444"/>
+          <line x1="70" y1="61.5" x2="70" y2="57" stroke="#3f6212" stroke-width="1.6"/>
+          <line x1="120" y1="52" x2="120" y2="48" stroke="#3f6212" stroke-width="1.6"/>
+          <line x1="94" y1="87" x2="94" y2="83" stroke="#3f6212" stroke-width="1.6"/>
+        </g>
+      </svg>`;
+    }
+
+    // ========== 14 UPGRADES ==========
+    const UPGRADES = {
+      click_power:  { name:"🪓 Сила клика",       desc:"Яблоки за клик",              base_cost:15,    cost_mult:1.16, base_effect:1,    effect_per_level:1 },
+      auto_clicker: { name:"🤖 Автосборщик",      desc:"Яблоки в секунду",            base_cost:80,    cost_mult:1.19, base_effect:0.1,  effect_per_level:0.16 },
+      multiplier:   { name:"✨ Множитель",         desc:"Весь доход ×",                base_cost:350,   cost_mult:1.30, base_effect:1.0,  effect_per_level:0.09 },
+      crit_chance:  { name:"🍀 Удача",            desc:"Шанс крита",                  base_cost:220,   cost_mult:1.25, base_effect:0.02, effect_per_level:0.009 },
+      crit_power:   { name:"💥 Сила крита",       desc:"Множитель крита",             base_cost:550,   cost_mult:1.28, base_effect:5.0,  effect_per_level:0.45 },
+      tree_level:   { name:"🌳 Уровень дерева",   desc:"Глобальный бонус",            base_cost:1600,  cost_mult:1.40, base_effect:1.0,  effect_per_level:0.16 },
+      golden_apple: { name:"🥇 Золотое яблоко",   desc:"Шанс ×10 яблок",              base_cost:1000,  cost_mult:1.35, base_effect:0.01, effect_per_level:0.007 },
+      efficiency:   { name:"⚙️ Эффективность",    desc:"Скидка на улучшения",         base_cost:2500,  cost_mult:1.48, base_effect:0,    effect_per_level:0.018 },
+      combo:        { name:"🔥 Комбо",            desc:"Бонус за быстрые клики",      base_cost:700,   cost_mult:1.26, base_effect:0.04, effect_per_level:0.035 },
+      double_tap:   { name:"✌️ Двойной удар",     desc:"Шанс кликнуть дважды",        base_cost:900,   cost_mult:1.32, base_effect:0.03, effect_per_level:0.015 },
+      growth:       { name:"🌱 Рост",             desc:"Бонус к автосборщику",        base_cost:450,   cost_mult:1.24, base_effect:0,    effect_per_level:0.06 },
+      fortune:      { name:"🎰 Фортуна",          desc:"Шанс ×25 яблок",              base_cost:5000,  cost_mult:1.45, base_effect:0.005,effect_per_level:0.004 },
+      resonance:    { name:"🔮 Резонанс",         desc:"Крит усиливает пассив",       base_cost:3500,  cost_mult:1.38, base_effect:0,    effect_per_level:0.08 },
+      overdrive:    { name:"⚡ Перегрузка",       desc:"Бонус при >10 комбо",         base_cost:2000,  cost_mult:1.36, base_effect:0,    effect_per_level:0.12 }
+    };
+
+    // ========== 13 SKINS ==========
+    const SKINS = {
+      default:   { name:"Обычное дерево",     price:0,         class:"skin-default",   bonusText:"—",                          bonus:{} },
+      golden:    { name:"Золотое дерево",     price:5000,      class:"skin-golden",    bonusText:"+8% ко всему доходу",        bonus:{income:0.08} },
+      crystal:   { name:"Хрустальное дерево", price:25000,     class:"skin-crystal",   bonusText:"+6% шанс крита",             bonus:{critChance:0.06} },
+      fire:      { name:"Огненное дерево",    price:100000,    class:"skin-fire",      bonusText:"+12% сила клика",            bonus:{click:0.12} },
+      neon:      { name:"Неоновое дерево",    price:400000,    class:"skin-neon",      bonusText:"+15% автосборщик",           bonus:{passive:0.15} },
+      sakura:    { name:"Сакура",             price:800000,    class:"skin-sakura",    bonusText:"+10% комбо-бонус",           bonus:{combo:0.10} },
+      toxic:     { name:"Токсичное дерево",   price:1500000,   class:"skin-toxic",     bonusText:"+8% крит + 5% доход",        bonus:{critChance:0.08, income:0.05} },
+      frozen:    { name:"Ледяное дерево",     price:3000000,   class:"skin-frozen",    bonusText:"+20% автосборщик",           bonus:{passive:0.20} },
+      cosmic:    { name:"Космическое дерево", price:6000000,   class:"skin-cosmic",    bonusText:"+10% множитель + 3% крит",   bonus:{mult:0.10, critChance:0.03} },
+      magma:     { name:"Магмовое дерево",    price:12000000,  class:"skin-magma",     bonusText:"+18% сила клика",            bonus:{click:0.18} },
+      rainbow:   { name:"Радужное дерево",    price:25000000,  class:"skin-rainbow",   bonusText:"+18% ко всему доходу",       bonus:{income:0.18} },
+      shadow:    { name:"Теневое дерево",     price:50000000,  class:"skin-shadow",    bonusText:"+12% крит + 10% доход",      bonus:{critChance:0.12, income:0.10} },
+      void:      { name:"Дерево Пустоты",     price:100000000, class:"skin-void",      bonusText:"+25% доход + 8% крит",       bonus:{income:0.25, critChance:0.08} },
+      celestial: { name:"Небесное дерево",    price:250000000, class:"skin-celestial", bonusText:"+30% доход + 5% всего",      bonus:{income:0.30, mult:0.05} }
+    };
+
+    // ====================== FIREBASE (общий топ) ======================
+    const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyC105rLOgUktWgEmzWeFX4gRzEw3rw2NQQ",
+      authDomain: "appleclicker-737b4.firebaseapp.com",
+      databaseURL: "https://appleclicker-737b4-default-rtdb.firebaseio.com",
+      projectId: "appleclicker-737b4",
+      storageBucket: "appleclicker-737b4.firebasestorage.app",
+      messagingSenderId: "60109604910",
+      appId: "1:60109604910:web:041d46bec58e13b12b77bf",
+      measurementId: "G-HER4ZH0PMF"
+    };
+    // Rules в Firebase → Realtime Database → Rules:
+    // { "rules": { "players": { ".read": true, ".write": true, ".indexOn": ["total_apples"] } } }
+
+    let firebaseReady = false;
+    let firebaseDb = null;
+
+    function loadFirebaseAndConnect() {
+      // Подключаем Firebase только после запуска игры — ошибка топа не ломает кликер
+      const cfg = FIREBASE_CONFIG;
+      const ok = cfg && cfg.apiKey && cfg.databaseURL
+        && !String(cfg.apiKey).includes("ВСТАВЬ")
+        && !String(cfg.authDomain || "").includes("ВСТАВЬ");
+      if (!ok) {
+        console.warn("Firebase: заполни FIREBASE_CONFIG");
+        return;
+      }
+      const s1 = document.createElement("script");
+      s1.src = "https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js";
+      s1.onload = function() {
+        const s2 = document.createElement("script");
+        s2.src = "https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js";
+        s2.onload = function() {
+          try {
+            if (!firebase.apps || !firebase.apps.length) firebase.initializeApp(cfg);
+            firebaseDb = firebase.database();
+            firebaseReady = true;
+            leaderboardUpsert();
+          } catch (e) {
+            console.warn("Firebase init failed", e);
+            firebaseReady = false;
+          }
+        };
+        s2.onerror = function() { console.warn("Firebase database script failed to load"); };
+        document.head.appendChild(s2);
+      };
+      s1.onerror = function() { console.warn("Firebase app script failed to load"); };
+      document.head.appendChild(s1);
+    }
+
+    // Ссылка из бота: ?tg_id=123&tg_name=Dsapp
+    const urlParams = new URLSearchParams(location.search);
+    const linkTgId = urlParams.get("tg_id");
+    const linkTgName = urlParams.get("tg_name");
+
+    function getPlayerId() {
+      if (linkTgId) {
+        const id = "tg_" + String(linkTgId).replace(/[^a-zA-Z0-9_-]/g, "");
+        localStorage.setItem("appleClicker_playerId", id);
+        return id;
+      }
+      let id = localStorage.getItem("appleClicker_playerId");
+      if (!id) {
+        id = "web_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+        localStorage.setItem("appleClicker_playerId", id);
+      }
+      return id;
+    }
+
+    async function leaderboardUpsert() {
+      if (!firebaseReady || !firebaseDb) return;
+      try {
+        const id = getPlayerId();
+        const score = Number(state.totalApples) || 0;
+        const ref = firebaseDb.ref("players/" + id);
+        const snap = await ref.once("value");
+        const prev = snap.val();
+        // Не затираем больший счёт (если играли с другого устройства)
+        const best = prev && prev.total_apples > score ? prev.total_apples : score;
+        await ref.set({
+          name: (state.playerName || "Игрок").slice(0, 32),
+          total_apples: best,
+          platform: id.startsWith("tg_") ? "telegram" : "web",
+          updated_at: Date.now()
+        });
+        if (best > state.totalApples) {
+          // optional: don't pull full progress, only leaderboard score is shared
+        }
+      } catch (e) {
+        console.warn("Firebase upsert failed", e);
+      }
+    }
+
+    async function leaderboardFetchTop(limit) {
+      if (!firebaseReady || !firebaseDb) return null;
+      try {
+        const snap = await firebaseDb.ref("players")
+          .orderByChild("total_apples")
+          .limitToLast(limit || 30)
+          .once("value");
+        const val = snap.val();
+        if (!val) return [];
+        const rows = Object.keys(val).map(id => ({
+          id,
+          name: val[id].name || "Игрок",
+          total_apples: val[id].total_apples || 0,
+          platform: val[id].platform || "web"
+        }));
+        rows.sort((a, b) => b.total_apples - a.total_apples);
+        return rows;
+      } catch (e) {
+        console.warn("Firebase fetch failed", e);
+        return null;
+      }
+    }
+
+    let state = {
+      apples:0, totalApples:0, playerName: (linkTgName ? decodeURIComponent(linkTgName) : "Игрок"),
+      upgrades:{ click_power:0,auto_clicker:0,multiplier:0,crit_chance:0,crit_power:0,tree_level:0,golden_apple:0,efficiency:0,combo:0,double_tap:0,growth:0,fortune:0,resonance:0,overdrive:0 },
+      skin:"default", ownedSkins:["default"],
+      lastPassive:Date.now(), comboCount:0, lastClickTime:0
+    };
+
+    const SAVE_KEY = "appleClicker_v3";
+
+    function formatNum(n) {
+      if (n>=1e15) return (n/1e15).toFixed(2)+"Qa";
+      if (n>=1e12) return (n/1e12).toFixed(2)+"T";
+      if (n>=1e9)  return (n/1e9).toFixed(2)+"B";
+      if (n>=1e6)  return (n/1e6).toFixed(2)+"M";
+      if (n>=1e3)  return (n/1e3).toFixed(1)+"K";
+      return Math.floor(n).toLocaleString("ru-RU");
+    }
+
+    function getSkinBonuses() {
+      let income=0,click=0,passive=0,mult=0,critChance=0,combo=0;
+      for (const id of state.ownedSkins) {
+        const b=SKINS[id]?.bonus||{};
+        income+=b.income||0; click+=b.click||0; passive+=b.passive||0;
+        mult+=b.mult||0; critChance+=b.critChance||0; combo+=b.combo||0;
+      }
+      return {income,click,passive,mult,critChance,combo};
+    }
+
+    function calcCost(id, level) {
+      const u=UPGRADES[id];
+      let cost=u.base_cost*Math.pow(u.cost_mult,level);
+      const disc=Math.min(0.4, state.upgrades.efficiency*UPGRADES.efficiency.effect_per_level);
+      return Math.floor(cost*(1-disc));
+    }
+
+    function getStats() {
+      const u=state.upgrades, sb=getSkinBonuses();
+      let click=UPGRADES.click_power.base_effect+u.click_power*UPGRADES.click_power.effect_per_level;
+      let passive=UPGRADES.auto_clicker.base_effect+u.auto_clicker*UPGRADES.auto_clicker.effect_per_level;
+      let mult=UPGRADES.multiplier.base_effect+u.multiplier*UPGRADES.multiplier.effect_per_level;
+      let crit=Math.min(0.75, UPGRADES.crit_chance.base_effect+u.crit_chance*UPGRADES.crit_chance.effect_per_level);
+      let critMult=UPGRADES.crit_power.base_effect+u.crit_power*UPGRADES.crit_power.effect_per_level;
+      let tree=UPGRADES.tree_level.base_effect+u.tree_level*UPGRADES.tree_level.effect_per_level;
+      let golden=Math.min(0.30, UPGRADES.golden_apple.base_effect+u.golden_apple*UPGRADES.golden_apple.effect_per_level);
+      let comboBonus=UPGRADES.combo.base_effect+u.combo*UPGRADES.combo.effect_per_level;
+      let doubleTap=Math.min(0.4, UPGRADES.double_tap.base_effect+u.double_tap*UPGRADES.double_tap.effect_per_level);
+      let growth=u.growth*UPGRADES.growth.effect_per_level;
+      let fortune=Math.min(0.15, UPGRADES.fortune.base_effect+u.fortune*UPGRADES.fortune.effect_per_level);
+      let resonance=u.resonance*UPGRADES.resonance.effect_per_level;
+      let overdrive=u.overdrive*UPGRADES.overdrive.effect_per_level;
+
+      click*=(1+sb.click);
+      passive*=(1+sb.passive)*(1+growth);
+      mult+=sb.mult;
+      crit=Math.min(0.82, crit+sb.critChance);
+      comboBonus*=(1+sb.combo);
+
+      const incomeMult=(1+sb.income)*mult*tree;
+      click*=incomeMult;
+      passive*=incomeMult;
+
+      return {click,passive,mult,crit,critMult,tree,golden,comboBonus,doubleTap,fortune,resonance,overdrive,incomeMult};
+    }
+
+    function applyPassive() {
+      const now=Date.now();
+      const elapsed=(now-state.lastPassive)/1000;
+      if (elapsed>0) {
+        const s=getStats();
+        const gained=s.passive*elapsed;
+        state.apples+=gained; state.totalApples+=gained;
+        state.lastPassive=now;
+      }
+    }
+
+    function save() {
+      try { localStorage.setItem(SAVE_KEY, JSON.stringify({...state, savedAt:Date.now()})); } catch(e){}
+      // sync to shared leaderboard (throttled via caller frequency)
+      if (!save._syncing) {
+        save._syncing = true;
+        leaderboardUpsert().finally(() => { save._syncing = false; });
+      }
+    }
+
+    function load() {
+      try {
+        let raw=localStorage.getItem(SAVE_KEY)||localStorage.getItem("appleClicker_v2")||localStorage.getItem("appleClickerSave");
+        if (raw) {
+          const data=JSON.parse(raw);
+          state={...state,...data};
+          if (!state.upgrades) state.upgrades={};
+          for (const k of Object.keys(UPGRADES)) if (typeof state.upgrades[k]!=="number") state.upgrades[k]=0;
+          if (!Array.isArray(state.ownedSkins)) state.ownedSkins=["default"];
+          if (!SKINS[state.skin]) state.skin="default";
+          if (!state.playerName) state.playerName="Игрок";
+          if (data.savedAt) {
+            const off=Math.min(28800,(Date.now()-data.savedAt)/1000);
+            if (off>5) { state.lastPassive=Date.now()-off*1000; applyPassive(); }
+          }
+        }
+      } catch(e){}
+    }
+
+    function localFallbackBoard() {
+      return [{ name: state.playerName || "Игрок", score: state.totalApples, isYou: true, platform: getPlayerId().startsWith("tg_") ? "telegram" : "web" }];
+    }
+
+    function showToast(msg) {
+      const t=document.getElementById("toast");
+      t.textContent=msg; t.classList.add("show");
+      clearTimeout(t._timer); t._timer=setTimeout(()=>t.classList.remove("show"),2000);
+    }
+
+    function spawnFloatingText(amount, isCrit, isGolden) {
+      const area=document.querySelector(".tree-area");
+      const el=document.createElement("div");
+      el.className="floating-text"+(isGolden?" golden":isCrit?" crit":"");
+      el.textContent=(isGolden?"🥇 ":isCrit?"💥 ":"+")+formatNum(amount);
+      el.style.left=(45+Math.random()*20)+"%"; el.style.top="32%";
+      area.appendChild(el); setTimeout(()=>el.remove(),1000);
+    }
+
+    function spawnBurst() {
+      const area=document.querySelector(".tree-area");
+      const colors=["#4ade80","#fbbf24","#34d399","#f87171","#a7f3d0"];
+      for (let i=0;i<8;i++) {
+        const p=document.createElement("div"); p.className="burst-particle";
+        const angle=(Math.PI*2*i)/8+Math.random()*0.4, dist=40+Math.random()*50;
+        p.style.setProperty("--tx",Math.cos(angle)*dist+"px");
+        p.style.setProperty("--ty",Math.sin(angle)*dist-20+"px");
+        p.style.background=colors[i%colors.length]; p.style.left="50%"; p.style.top="42%"; p.style.marginLeft="-4px";
+        area.appendChild(p); setTimeout(()=>p.remove(),700);
+      }
+    }
+
+    function applySkinVisual() {
+      const btn=document.getElementById("treeBtn");
+      const skin=SKINS[state.skin]||SKINS.default;
+      btn.className="tree-btn "+skin.class;
+      btn.innerHTML=createTreeSVG();
+    }
+
+    function updateHeader() {
+      const s=getStats();
+      document.getElementById("applesDisplay").innerHTML=`${formatNum(state.apples)} <span>яблок</span>`;
+      document.getElementById("passiveInfo").textContent=`+${formatNum(s.passive)} / сек`;
+    }
+
+    function renderUpgrades() {
+      const panel=document.getElementById("panel-upgrades");
+      const scrollPos=panel.scrollTop;
+      const list=document.getElementById("upgradesList"); list.innerHTML="";
+      for (const [id,u] of Object.entries(UPGRADES)) {
+        const level=state.upgrades[id], cost=calcCost(id,level), can=state.apples>=cost;
+        const div=document.createElement("div"); div.className="item";
+        div.innerHTML=`<div class="item-info"><div class="item-name">${u.name}</div><div class="item-desc">${u.desc}</div><div class="item-level">Ур. ${level}</div></div>
+          <button class="buy-btn" ${can?"":"disabled"} data-upgrade="${id}">${formatNum(cost)} 🍎</button>`;
+        list.appendChild(div);
+      }
+      list.querySelectorAll("[data-upgrade]").forEach(b=>b.addEventListener("click",()=>buyUpgrade(b.dataset.upgrade)));
+      panel.scrollTop=scrollPos;
+    }
+
+    // Lightweight update — only prices/disabled, no scroll jump
+    function updateUpgradeButtons() {
+      const list=document.getElementById("upgradesList");
+      if (!list.children.length) return;
+      list.querySelectorAll("[data-upgrade]").forEach(btn=>{
+        const id=btn.dataset.upgrade;
+        const level=state.upgrades[id];
+        const cost=calcCost(id,level);
+        const can=state.apples>=cost;
+        btn.textContent=formatNum(cost)+" 🍎";
+        btn.disabled=!can;
+        const levelEl=btn.parentElement.querySelector(".item-level");
+        if (levelEl) levelEl.textContent="Ур. "+level;
+      });
+    }
+
+    function renderShop() {
+      const panel=document.getElementById("panel-shop");
+      const scrollPos=panel.scrollTop;
+      const list=document.getElementById("shopList"); list.innerHTML="";
+      for (const [id,skin] of Object.entries(SKINS)) {
+        const owned=state.ownedSkins.includes(id), eq=state.skin===id;
+        let txt,cls,dis=false;
+        if(eq){txt="Надето";cls="buy-btn equipped";dis=true;}
+        else if(owned){txt="Надеть";cls="buy-btn owned";}
+        else{txt=formatNum(skin.price)+" 🍎";cls="buy-btn";if(state.apples<skin.price)dis=true;}
+        const div=document.createElement("div"); div.className="item";
+        div.innerHTML=`<div class="skin-preview ${skin.class}">${createTreeSVG()}</div>
+          <div class="item-info"><div class="item-name">${skin.name}</div><div class="item-desc">${owned?"Куплено":"Скин"}</div><div class="item-bonus">🎁 ${skin.bonusText}</div></div>
+          <button class="${cls}" ${dis?"disabled":""} data-skin="${id}">${txt}</button>`;
+        list.appendChild(div);
+      }
+      list.querySelectorAll("[data-skin]").forEach(b=>b.addEventListener("click",()=>handleSkin(b.dataset.skin)));
+      panel.scrollTop=scrollPos;
+    }
+
+    function renderStats() {
+      const s=getStats(), sb=getSkinBonuses();
+      document.getElementById("statsGrid").innerHTML=`
+        <div class="stat-card"><div class="stat-value">${formatNum(state.apples)}</div><div class="stat-label">Сейчас</div></div>
+        <div class="stat-card"><div class="stat-value">${formatNum(state.totalApples)}</div><div class="stat-label">Всего</div></div>
+        <div class="stat-card"><div class="stat-value">${formatNum(s.click)}</div><div class="stat-label">За клик</div></div>
+        <div class="stat-card"><div class="stat-value">${formatNum(s.passive)}</div><div class="stat-label">В секунду</div></div>
+        <div class="stat-card"><div class="stat-value">×${s.mult.toFixed(2)}</div><div class="stat-label">Множитель</div></div>
+        <div class="stat-card"><div class="stat-value">${(s.crit*100).toFixed(1)}%</div><div class="stat-label">Крит</div></div>
+        <div class="stat-card"><div class="stat-value">×${s.critMult.toFixed(1)}</div><div class="stat-label">Сила крита</div></div>
+        <div class="stat-card"><div class="stat-value">${(s.golden*100).toFixed(1)}%</div><div class="stat-label">Зол. яблоко</div></div>
+        <div class="stat-card"><div class="stat-value">${(s.doubleTap*100).toFixed(1)}%</div><div class="stat-label">Двойной удар</div></div>
+        <div class="stat-card"><div class="stat-value">+${(sb.income*100).toFixed(0)}%</div><div class="stat-label">Скины</div></div>`;
+    }
+
+    async function renderLeaderboard() {
+      const list = document.getElementById("leaderboardList");
+      list.innerHTML = "<div class='lb-row'><div class='lb-name'>Загрузка...</div></div>";
+      document.getElementById("playerNameInput").value = state.playerName || "";
+
+      await leaderboardUpsert();
+      let rows = await leaderboardFetchTop(30);
+      const myId = getPlayerId();
+
+      if (!rows) {
+        rows = localFallbackBoard().map(p => ({
+          id: myId, name: p.name, total_apples: p.score, platform: p.platform
+        }));
+        list.innerHTML = "";
+        const note = document.createElement("div");
+        note.className = "lb-row";
+        note.innerHTML = "<div class='lb-name' style='color:var(--muted);font-size:0.8rem'>Чтобы топ был общий — вставь FIREBASE_CONFIG в код (бесплатно на console.firebase.google.com).</div>";
+        list.appendChild(note);
+      } else {
+        list.innerHTML = "";
+      }
+
+      if (!rows.length) {
+        list.innerHTML += "<div class='lb-row'><div class='lb-name'>Пока пусто. Кликай и займи 1 место!</div></div>";
+        return;
+      }
+
+      rows.forEach((p, i) => {
+        const rank = i + 1;
+        const rankCls = rank === 1 ? "gold" : rank === 2 ? "silver" : rank === 3 ? "bronze" : "";
+        const isYou = p.id === myId;
+        const plat = p.platform === "telegram" ? "📱" : "🌐";
+        const div = document.createElement("div");
+        div.className = "lb-row";
+        div.innerHTML = `<div class="lb-rank ${rankCls}">${rank <= 3 ? ["🥇","🥈","🥉"][rank-1] : rank}</div>
+          <div class="lb-name ${isYou ? "you" : ""}">${isYou ? "👤 " : ""}${plat} ${p.name || "Игрок"}</div>
+          <div class="lb-score">${formatNum(p.total_apples || 0)} 🍎</div>`;
+        list.appendChild(div);
+      });
+    }
+
+    function refreshUI() {
+      updateHeader(); applySkinVisual();
+      const a=document.querySelector(".panel.active")?.id;
+      if(a==="panel-upgrades") renderUpgrades();
+      if(a==="panel-shop") renderShop();
+      if(a==="panel-stats") renderStats();
+      if(a==="panel-leaderboard") renderLeaderboard();
+    }
+
+    function clickTree() {
+      applyPassive();
+      const s=getStats();
+      const now=Date.now();
+      if(now-state.lastClickTime<800) state.comboCount=Math.min(25,state.comboCount+1);
+      else state.comboCount=0;
+      state.lastClickTime=now;
+
+      let comboMult=1+state.comboCount*s.comboBonus;
+      if(state.comboCount>=10) comboMult*=(1+s.overdrive);
+
+      const isCrit=Math.random()<s.crit;
+      const isGolden=Math.random()<s.golden;
+      const isFortune=Math.random()<s.fortune;
+      const isDouble=Math.random()<s.doubleTap;
+
+      let mult=1;
+      if(isCrit) mult*=s.critMult;
+      if(isGolden) mult*=10;
+      if(isFortune) mult*=25;
+      mult*=comboMult;
+
+      let gained=s.click*mult;
+      if(isDouble) gained*=2;
+
+      // Resonance: crit boosts passive briefly (instant apples)
+      if(isCrit && s.resonance>0) {
+        gained+=s.passive*s.resonance*3;
+      }
+
+      state.apples+=gained; state.totalApples+=gained;
+      spawnFloatingText(gained, isCrit||isFortune, isGolden||isFortune);
+      spawnBurst();
+
+      const btn=document.getElementById("treeBtn");
+      // Leaf rustle animation
+      btn.classList.remove("rustle");
+      void btn.offsetWidth;
+      btn.classList.add("rustle");
+      setTimeout(() => btn.classList.remove("rustle"), 750);
+
+      if(isCrit||isGolden||isFortune){ btn.classList.remove("crit"); void btn.offsetWidth; btn.classList.add("crit"); }
+      updateHeader();
+      if(document.getElementById("panel-upgrades").classList.contains("active")) updateUpgradeButtons();
+      save();
+    }
+
+    function buyUpgrade(id) {
+      applyPassive();
+      const cost=calcCost(id,state.upgrades[id]);
+      if(state.apples<cost) return;
+      state.apples-=cost; state.upgrades[id]++;
+      showToast(`${UPGRADES[id].name} → ур. ${state.upgrades[id]}`);
+      updateHeader();
+      // Full re-render but keep scroll position
+      if(document.getElementById("panel-upgrades").classList.contains("active")) renderUpgrades();
+      else refreshUI();
+      save();
+    }
+
+    function handleSkin(id) {
+      applyPassive();
+      if(state.ownedSkins.includes(id)) {
+        state.skin=id; showToast(`Надет: ${SKINS[id].name}`);
+      } else {
+        if(state.apples<SKINS[id].price) return;
+        state.apples-=SKINS[id].price;
+        state.ownedSkins.push(id); state.skin=id;
+        showToast(`${SKINS[id].name}! ${SKINS[id].bonusText}`);
+      }
+      refreshUI(); save();
+    }
+
+    document.querySelectorAll(".nav button").forEach(btn=>{
+      btn.addEventListener("click",()=>{
+        document.querySelectorAll(".nav button").forEach(b=>b.classList.remove("active"));
+        document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById("panel-"+btn.dataset.panel).classList.add("active");
+        refreshUI();
+      });
+    });
+
+    document.getElementById("treeBtn").addEventListener("click", clickTree);
+
+    document.getElementById("saveNameBtn").addEventListener("click",()=>{
+      const v=document.getElementById("playerNameInput").value.trim().slice(0,16);
+      if(v){ state.playerName=v; showToast("Ник сохранён: "+v); save(); renderLeaderboard(); }
+    });
+
+    function createAmbientParticles() {
+      const c=document.getElementById("particles");
+      for(let i=0;i<16;i++){
+        const p=document.createElement("div");
+        p.className="particle"+(i%3===0?" leaf":"");
+        p.style.left=Math.random()*100+"%";
+        p.style.animationDuration=(12+Math.random()*18)+"s";
+        p.style.animationDelay=(Math.random()*15)+"s";
+        p.style.width=p.style.height=(4+Math.random()*6)+"px";
+        c.appendChild(p);
+      }
+    }
+
+    try {
+      load();
+      if (linkTgName) {
+        try { state.playerName = decodeURIComponent(linkTgName).slice(0, 32); } catch(e) {}
+      }
+      getPlayerId();
+      applyPassive();
+      refreshUI();
+      createAmbientParticles();
+    } catch (e) {
+      console.error("Init error", e);
+      try {
+        const btn = document.getElementById("treeBtn");
+        if (btn && !btn.innerHTML.trim()) btn.innerHTML = createTreeSVG();
+        document.getElementById("treeBtn") && document.getElementById("treeBtn").addEventListener("click", clickTree);
+      } catch(e2) {}
+    }
+    // Firebase после игры — топ не обязателен для кликов
+    setTimeout(() => { try { loadFirebaseAndConnect(); } catch(e){} }, 800);
+    // Открыть топ, если ?panel=leaderboard
+    if (urlParams.get("panel") === "leaderboard") {
+      document.querySelectorAll(".nav button").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+      const btn = document.querySelector('[data-panel="leaderboard"]');
+      if (btn) { btn.classList.add("active"); document.getElementById("panel-leaderboard").classList.add("active"); renderLeaderboard(); }
+    }
+
+    setInterval(()=>{
+      applyPassive(); updateHeader();
+      if(document.getElementById("panel-upgrades").classList.contains("active")) updateUpgradeButtons();
+    },250);
+    setInterval(save,8000);
+    window.addEventListener("beforeunload",save);
+    document.addEventListener("visibilitychange",()=>{ if(document.hidden) save(); });
+  </script>
+</body>
+</html>
